@@ -27,14 +27,14 @@ The `Gblocks` and `pal2nal.pl` binaries should be in your path
     <joseph.ryan@whitney.ufl.edu>
 
 ## SYNOPSIS
-    pal2nal_gblocker --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR]
+    pal2nal_gblocker --mafft=MAFFT_FILE --cds=CDS_FASTA_FILE [--outdir=OUTDIR]
     [--version] [--help]
 
 ## OPTIONS
     --mafft
       This is an alignment in FASTA format from the program MAFFT.
 
-    --fasta
+    --cds
       This is a FASTA file of CDS sequences that correspond to the mafft
       file
 
