@@ -1,0 +1,192 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use autodie;
+use JFR::Fasta;
+use File::Temp;
+use Data::Dumper;
+use Getopt::Long;
+use Pod::Usage;
+
+our $VERSION = 0.03;
+our $DEVNULL = '/dev/null'; # might want to change this if using windoze
+
+MAIN: {
+    my $rh_opts = process_options();
+    my $p2n_out = run_pal2nal($rh_opts);
+    gblocks_wrapper_w_report($p2n_out);
+    gblock_cutter($rh_opts,"$p2n_out-gb.txt");
+}
+
+# runs pal2nal using the provided mafft and fasta files (output is fasta)
+sub run_pal2nal {
+    my $rh_o = shift;
+    my $palfile = "$rh_o->{'fasta'}.pal";
+    open(my $fh, '>',"$rh_o->{'outdir'}/$palfile" );
+    my $cmd = "pal2nal.pl $rh_o->{'mafft'} $rh_o->{'fasta'} -output fasta";
+    my $results = `$cmd`;
+    print $fh $results;
+    return "$rh_o->{'outdir'}/$palfile";
+}
+
+# gets and checks options provided on the command line
+sub process_options {
+    my $rh_opts = {};
+    my $opt_results = Getopt::Long::GetOptions(
+                                  "mafft=s" => \$rh_opts->{'mafft'},
+                                  "fasta=s" => \$rh_opts->{'fasta'},
+                                 "outdir=s" => \$rh_opts->{'outdir'},
+                                     "help" => \$rh_opts->{'help'},
+                                  "version" => \$rh_opts->{'version'},
+                                   );
+    pod2usage({-exitval => 0, -verbose => 2}) if ($rh_opts->{'help'});
+    die "pal2nal_gblocker version $VERSION\n" if ($rh_opts->{'version'});
+    if ($rh_opts->{'outdir'}) {
+        die "$rh_opts->{'outdir'} exists; delete it." if (-e $rh_opts->{'outdir'});
+        mkdir $rh_opts->{'outdir'};
+    } else {
+        $rh_opts->{'outdir'} = File::Temp::tempdir();
+    }
+    $rh_opts->{'outdir'} = $rh_opts->{'outdir'} || '.';
+    usage() unless ($rh_opts->{'mafft'} && $rh_opts->{'fasta'});
+    return $rh_opts;
+}
+
+# prints a usage message to STDOUT and then dies
+sub usage {
+    print "$0 --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR] [--version] [--help]\n";
+    exit;
+}
+
+# run GBLOCKS altering -b2 to take into account sequence length
+# -b2 = Minimum Number Of Sequences For A Flank Position
+# also produce parseable text output with -p=t
+sub gblocks_wrapper_w_report {
+    my $file = shift;
+
+    open IN, $file;
+    my $count = 0;
+    while (my $line = <IN>) {
+        $count++ if ($line =~ m/^\s*>/);
+    }
+    die "Too few sequences ($count) to proceed with $file\n" if ($count < 4);
+
+    my $b2 = int(0.65 * $count);
+    $b2 =~ s/\.\d*$//; 
+    system "Gblocks $file -b2=$b2 -b3=10 -b4=5 -b5=a -p=t > $DEVNULL";
+}
+
+# this prints nucleotides corresponding to non-gblocked sections
+sub gblock_cutter{
+    my $rh_o   = shift;
+    my $gb_out = shift;
+
+    my ($gbstr,$rh_seqs) = parse_gblocks($gb_out);
+    my @gb_pos = ($gbstr =~ m/./g );
+    foreach my $key (keys %{$rh_seqs}) {
+        print ">$key\n";
+        my @nts = ($rh_seqs->{$key} =~ m/./g);
+        for (my $i = 0; $i < @nts; $i++) {
+            next unless ($gb_pos[$i] eq '#');
+            print $nts[$i];
+        }
+        print "\n";
+    }  
+
+}
+
+# accepts a gblocks 'Text' output file (generated with -pt) 
+# returns a string which shows gblocked sections and returns hash w/sequences
+sub parse_gblocks {
+    my $file  = shift;
+    my $gbstr = '';
+    my %aln   = ();
+    my $flag  = 0;
+    open IN, $file or die "cannot open $file:$!";
+    while (my $line = <IN>) {
+        if ($line =~ m/^\s+=+/) {
+            $flag = 1;
+            next;
+        } elsif ($line =~ m/^Gblocks\s\s+(\S+)/) {
+            $gbstr .= $1;
+            $flag = 0;
+        } elsif ($flag) {
+            $line =~ m/^(\S+)\s+(\S+)\s*$/ || die "unexpected $line";    
+            $aln{$1} .= $2;
+        }
+    }
+    return ($gbstr, \%aln);
+}
+
+__END__ 
+
+=head1 NAME
+
+B<pal2nal_gblocker> - build NT alignments that have been gblocked
+
+=head1 AUTHOR
+
+Aaron Szczepanek <aaron@whitney.ufl.edu>, Joseph F. Ryan <joseph.ryan@whitney.ufl.edu>
+
+=head1 SYNOPSIS 
+
+pal2nal_gblocker --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR] [--version] [--help]
+
+=head1 OPTIONS
+
+=over 2
+
+=item B<--mafft>
+
+This is an alignment in FASTA format from the program MAFFT. 
+
+=item B<--fasta>
+
+This is a FASTA file of CDS sequences that correspond to the mafft file
+
+=item B<--outdir>
+
+If provided, intermediate files will be placed in this directory
+
+=item B<--help>
+
+Print this manual
+
+=item B<--version>
+
+Print the version
+
+=back
+
+=head1 DESCRIPTION
+
+This program will accept an amino-acid alignment and corresponding CDS file,
+and produce a nucleotide alignment that corresponds with a GBLOCKED alignment.
+
+=head1 TODO
+
+Allow users to send options for GBLOCKS and for pal2nal
+
+=head1 BUGS
+
+Please report them to any or all of the authors.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2017 Aaron Szczepanek, Joseph F. Ryan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
