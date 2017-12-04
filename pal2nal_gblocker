@@ -8,7 +8,7 @@ use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
 our $DEVNULL = '/dev/null'; # might want to change this if using windoze
 
 MAIN: {
@@ -18,12 +18,12 @@ MAIN: {
     gblock_cutter($rh_opts,"$p2n_out-gb.txt");
 }
 
-# runs pal2nal using the provided mafft and fasta files (output is fasta)
+# runs pal2nal using the provided mafft and cds files (output is fasta)
 sub run_pal2nal {
     my $rh_o = shift;
-    my $palfile = "$rh_o->{'fasta'}.pal";
+    my $palfile = "$rh_o->{'cds'}.pal";
     open(my $fh, '>',"$rh_o->{'outdir'}/$palfile" );
-    my $cmd = "pal2nal.pl $rh_o->{'mafft'} $rh_o->{'fasta'} -output fasta";
+    my $cmd = "pal2nal.pl $rh_o->{'mafft'} $rh_o->{'cds'} -output fasta";
     my $results = `$cmd`;
     print $fh $results;
     return "$rh_o->{'outdir'}/$palfile";
@@ -34,7 +34,7 @@ sub process_options {
     my $rh_opts = {};
     my $opt_results = Getopt::Long::GetOptions(
                                   "mafft=s" => \$rh_opts->{'mafft'},
-                                  "fasta=s" => \$rh_opts->{'fasta'},
+                                  "cds=s" => \$rh_opts->{'cds'},
                                  "outdir=s" => \$rh_opts->{'outdir'},
                                      "help" => \$rh_opts->{'help'},
                                   "version" => \$rh_opts->{'version'},
@@ -48,13 +48,13 @@ sub process_options {
         $rh_opts->{'outdir'} = File::Temp::tempdir();
     }
     $rh_opts->{'outdir'} = $rh_opts->{'outdir'} || '.';
-    usage() unless ($rh_opts->{'mafft'} && $rh_opts->{'fasta'});
+    usage() unless ($rh_opts->{'mafft'} && $rh_opts->{'cds'});
     return $rh_opts;
 }
 
 # prints a usage message to STDOUT and then dies
 sub usage {
-    print "$0 --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR] [--version] [--help]\n";
+    print "$0 --mafft=MAFFT_FILE --cds=CDS_FASTA_FILE [--outdir=OUTDIR] [--version] [--help]\n";
     exit;
 }
 
@@ -130,7 +130,7 @@ Aaron Szczepanek <aaron@whitney.ufl.edu>, Joseph F. Ryan <joseph.ryan@whitney.uf
 
 =head1 SYNOPSIS 
 
-pal2nal_gblocker --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR] [--version] [--help]
+pal2nal_gblocker --mafft=MAFFT_FILE --cds=CDS_FASTA_FILE [--outdir=OUTDIR] [--version] [--help]
 
 =head1 OPTIONS
 
@@ -140,7 +140,7 @@ pal2nal_gblocker --mafft=MAFFT_FILE --fasta=FASTA_FILE [--outdir=OUTDIR] [--vers
 
 This is an alignment in FASTA format from the program MAFFT. 
 
-=item B<--fasta>
+=item B<--cds>
 
 This is a FASTA file of CDS sequences that correspond to the mafft file
 
