@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 use autodie;
-use JFR::Fasta;
 use File::Temp;
 use Data::Dumper;
 use Getopt::Long;
