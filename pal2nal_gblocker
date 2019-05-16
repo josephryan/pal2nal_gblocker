@@ -8,7 +8,7 @@ use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
 
-our $VERSION = 0.05;
+our $VERSION = 0.06;
 our $DEVNULL = '/dev/null'; # might want to change this if using windoze
 
 MAIN: {
@@ -21,7 +21,8 @@ MAIN: {
 # runs pal2nal using the provided mafft and cds files (output is fasta)
 sub run_pal2nal {
     my $rh_o = shift;
-    my $palfile = "$rh_o->{'cds'}.pal";
+    $rh_o->{'cds'} =~ m/([^\/]+)$/ or die "unexpected: $rh_o->{'cds'}";
+    my $palfile = "$1.pal";
     open(my $fh, '>',"$rh_o->{'outdir'}/$palfile" );
     my $cmd = "pal2nal.pl $rh_o->{'mafft'} $rh_o->{'cds'} -output fasta";
     my $results = `$cmd`;
